@@ -55,6 +55,7 @@ export default function Home() {
     <div className="max-w-12xl mx-auto p-4">
       <Header />
       <div className="flex flex-col md:flex-row gap-4">
+
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/3 flex flex-col items-center">
           <Image
@@ -64,6 +65,7 @@ export default function Home() {
             height={100}
             className="rounded"
           />
+           <p className="font-bold mt-2 text-2xl">Kyle Gomez</p>
           <div className="border rounded-lg mt-4 p-4 w-full text-sm shadow-sm bg-white">
             <p className="font-bold text-lg text-gray-700 border-b pb-1 mb-2">
               Information
@@ -75,9 +77,9 @@ export default function Home() {
             </div>
 
             <div className="mb-3">
-              <p className="text-blue-500 font-semibold">Contacts</p>
-              <p className="text-gray-600">gomezkyle3102@gmail.com</p>
-              <p className="text-gray-600">09274670264</p>
+              <p className="text-blue-500 font-semibold">Birthday</p>
+              <p className="text-gray-600">August 31, 2002</p>
+              
             </div>
 
             <div>
@@ -89,10 +91,8 @@ export default function Home() {
 
         {/* RIGHT SIDE */}
         <div className="w-full md:w-2/3">
-          <p className="font-bold text-2xl">Kyle Gomez</p>
-          <Separator className="mt-3 mb-3" />
-          <p className="font-bold text-2xl">Wall</p>
-
+         
+        <p className="font-bold text-2xl">Wall</p>
           <div className="mt-2">
             <Textarea
               placeholder="Write something..."
