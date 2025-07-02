@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/custom_components/header";
 import PhotoUpload from "@/components/custom_components/file_upload";
-import { supabase } from "@/lib/supaBaseClient";
+import { getSupabaseClient } from "@/lib/supaBaseClient";
+const supabase = getSupabaseClient();
+
 import { getRelativeTime } from "@/lib/timeUtils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
