@@ -177,7 +177,7 @@ export default function Home() {
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sharing...
+                  Uploading your post...
                 </>
               ) : (
                 "Share"
@@ -204,12 +204,12 @@ export default function Home() {
                     className="border-b pb-3"
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <p className="font-medium text-gray-800">Kyle Gomez</p>
+                      <p className="text-xl font-bold text-gray-800">Kyle Gomez</p>
                       <p className="text-xs text-gray-400">
                         {getRelativeTime(post.created_at)}
                       </p>
                     </div>
-                    <p className="text-sm text-gray-700">{post.body}</p>
+                    <p className="text-md text-gray-700">{post.body}</p>
                     {post.image_url && (
                       <div className="mt-2">
                         <Image
