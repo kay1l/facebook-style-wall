@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supaBaseClient";
 import { getRelativeTime } from "@/lib/timeUtils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const [wallText, setWallText] = useState("");
@@ -18,15 +19,18 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [resetSignal, setResetSignal] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const pageSize = 5; // how many posts per load
-  const [lastPostCreatedAt, setLastPostCreatedAt] = useState<string | null>(null);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [lastPostCreatedAt, setLastPostCreatedAt] = useState<string | null>(
+    null
+  );
+  const pageSize = 5;
 
   useEffect(() => {
     loadInitialPosts();
   }, []);
 
   const loadInitialPosts = async () => {
+    setLoadingInitial(true);
     const { data, error } = await supabase
       .from("posts")
       .select("*")
@@ -35,12 +39,14 @@ export default function Home() {
 
     if (error) {
       console.error("Error fetching posts:", error);
+      toast.error("Failed to load posts.");
     } else {
       setPosts(data || []);
-      if (data && data.length > 0) {
+      if (data?.length > 0) {
         setLastPostCreatedAt(data[data.length - 1].created_at);
       }
     }
+    setLoadingInitial(false);
   };
 
   const loadMorePosts = async () => {
@@ -58,11 +64,11 @@ export default function Home() {
       console.error("Error loading more posts:", error);
       toast.error("Failed to load more posts.");
     } else {
-      setPosts(prev => [...prev, ...(data || [])]);
-      if (data && data.length > 0) {
+      setPosts((prev) => [...prev, ...(data || [])]);
+      if (data?.length > 0) {
         setLastPostCreatedAt(data[data.length - 1].created_at);
       } else {
-        setLastPostCreatedAt(null); // no more posts
+        setLastPostCreatedAt(null);
       }
     }
     setLoadingMore(false);
@@ -76,159 +82,175 @@ export default function Home() {
     setIsUploading(true);
     let imageUrl = null;
 
-    if (file) {
-      const filePath = `wall/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("wall-uploads")
-        .upload(filePath, file);
+    try {
+      if (file) {
+        const filePath = `wall/${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("wall-uploads")
+          .upload(filePath, file);
 
-      if (uploadError) {
-        console.error("Error uploading file:", uploadError);
-        toast.error("Failed to upload photo.");
-        setIsUploading(false);
-        return;
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("wall-uploads")
+          .getPublicUrl(filePath);
+
+        imageUrl = urlData.publicUrl;
+        await new Promise((res) => setTimeout(res, 500));
       }
 
-      const { data: urlData } = supabase.storage
-        .from("wall-uploads")
-        .getPublicUrl(filePath);
+      const { error } = await supabase.from("posts").insert([
+        {
+          user_id: null,
+          body: wallText.trim(),
+          image_url: imageUrl,
+        },
+      ]);
 
-      imageUrl = urlData.publicUrl;
-      await new Promise((res) => setTimeout(res, 500));
-    }
+      if (error) throw error;
 
-    const { error } = await supabase.from("posts").insert([
-      {
-        user_id: null,
-        body: wallText.trim(),
-        image_url: imageUrl,
-      },
-    ]);
-
-    if (error) {
-      console.log("Error inserting post", error);
-      toast.error("Something went wrong.");
-    } else {
       setWallText("");
       setSelectedFile(null);
       setResetSignal(true);
-      await loadInitialPosts(); // reload the first page to show the new post at top
+      await loadInitialPosts();
       toast.success("Post shared successfully!");
       setResetSignal(false);
+    } catch (err) {
+      console.error("Post share error", err);
+      toast.error("Something went wrong while sharing.");
+    } finally {
+      setIsUploading(false);
     }
-    setIsUploading(false);
   };
 
   return (
     <div className="max-w-12xl mx-auto p-4">
       <Header />
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* LEFT SIDE */}
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* LEFT */}
         <div className="w-full md:w-1/3 flex flex-col items-center">
           <Image
             src="/images/kyle.png"
             alt="Kyle Gomez"
-            width={150}
-            height={150}
-            className="rounded"
+            width={200}
+            height={200}
+            className=""
           />
-          <p className="font-bold mt-2 text-2xl">Kyle Gomez</p>
-          <div className="border rounded-lg mt-4 p-4 w-full text-sm shadow-sm bg-white">
-            <p className="font-bold text-lg text-gray-700 border-b pb-1 mb-2">
+
+          <div className="mt-3 w-full max-w-xs bg-white shadow-sm border rounded-lg p-4">
+            <p className="font-bold text-gray-700 mb-2 border-b pb-1">
               Information
             </p>
-            <p className="text-gray-600">Kyle Gomez</p>
-            <p className="text-gray-600">Web Developer</p>
-            <p className="text-blue-500 font-semibold mt-2">Birthday</p>
-            <p className="text-gray-600">August 31, 2002</p>
-            <p className="text-blue-500 font-semibold mt-2">Current City</p>
-            <p className="text-gray-600">Ormoc City, Philippines</p>
+            <p className="font-semibold text-lg text-center">Kyle Gomez</p>
+            <p className="text-sm text-gray-600 text-center">Web Developer</p>
+            <p className="text-xs text-gray-500 mt-2">
+              <span className="font-medium text-blue-500">Birthday:</span> Aug
+              31, 2002
+            </p>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-blue-500">City:</span> Ormoc, PH
+            </p>
           </div>
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* RIGHT */}
         <div className="w-full md:w-2/3">
-          <p className="font-bold text-2xl">Wall</p>
-          <div className="mt-2">
-            <Textarea
-              placeholder="Write something..."
-              value={wallText}
-              onChange={(e) => setWallText(e.target.value.slice(0, 280))}
-              className="border-2 border-dashed border-gray-400 rounded bg-white min-h-[100px]"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              {280 - wallText.length} characters remaining
-            </div>
-            <div className="mt-2">
-              <PhotoUpload
-                onFileSelect={(file) => setSelectedFile(file)}
-                resetSignal={resetSignal}
-              />
-            </div>
-            <div className="mt-2 flex justify-end">
-              <Button
-                className="bg-blue-500 text-white rounded px-8"
-                onClick={() => handleShare(selectedFile)}
-              >
-                Share
-              </Button>
-            </div>
-         
-            {isUploading && (
-              <div className="flex flex-col items-center justify-start">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-                <p className="text-xs text-gray-500 mt-1">Uploading...</p>
-              </div>
-            )}
-           
+          <Textarea
+            placeholder="What's on your mind?"
+            value={wallText}
+            onChange={(e) => setWallText(e.target.value.slice(0, 280))}
+            className="border rounded p-2 bg-white min-h-[100px]"
+          />
+          <div className="text-xs mt-2 mb-2 text-gray-500 text-right">
+            {280 - wallText.length} characters remaining
+          </div>
+          <PhotoUpload
+            onFileSelect={setSelectedFile}
+            resetSignal={resetSignal}
+          />
+          <div className="flex justify-end mt-2">
+            <Button
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-1.5"
+              onClick={() => handleShare(selectedFile)}
+              disabled={(!wallText.trim() && !selectedFile) || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sharing...
+                </>
+              ) : (
+                "Share"
+              )}
+            </Button>
           </div>
 
-          <div className="mt-4 space-y-4">
-           
+          {loadingInitial ? (
+            <div className="flex justify-center mt-4">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-sm text-gray-400">
+                Loading posts...
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              <AnimatePresence>
+                {posts.map((post, idx) => (
+                  <motion.div
+                    key={post.id || idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="border-b pb-3"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="font-medium text-gray-800">Kyle Gomez</p>
+                      <p className="text-xs text-gray-400">
+                        {getRelativeTime(post.created_at)}
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-700">{post.body}</p>
+                    {post.image_url && (
+                      <div className="mt-2">
+                        <Image
+                          src={`${post.image_url}?cache_bust=${Date.now()}`}
+                          alt="Post image"
+                          width={300}
+                          height={200}
+                          className="rounded-md"
+                        />
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
 
-            {posts.map((post, idx) => (
-              <div key={idx} className="border-b pb-2">
-                <p className="font-bold text-md mb-1">Kyle Gomez</p>
-                <div className="flex justify-between items-center text-sm">
-                  <p>{post.body}</p>
-                  <p className="text-xs text-gray-500 whitespace-nowrap">
-                    {getRelativeTime(post.created_at)}
-                  </p>
+              {lastPostCreatedAt && (
+                <div className="flex justify-center">
+                  <Button
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-1.5"
+                    onClick={loadMorePosts}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      "Load More"
+                    )}
+                  </Button>
                 </div>
-                {post.image_url && (
-                  <div className="mt-2">
-                    <Image
-                      src={`${post.image_url}?cache_bust=${Date.now()}`}
-                      alt="Wall post image"
-                      width={150}
-                      height={100}
-                      className="rounded"
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              )}
 
-            {lastPostCreatedAt && (
-              <div className="flex justify-center">
-                <Button className="bg-blue-500" onClick={loadMorePosts} disabled={loadingMore}>
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    "Load More"
-                  )}
-                </Button>
-              </div>
-            )}
-            {!lastPostCreatedAt && posts.length > 0 && (
-              <p className="text-center text-sm text-gray-500">
-                You’ve reached the end.
-              </p>
-            )}
-          </div>
+              {!lastPostCreatedAt && posts.length > 0 && (
+                <p className="text-center text-sm text-gray-400">
+                  You’ve reached the end.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
