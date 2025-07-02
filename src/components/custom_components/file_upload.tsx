@@ -36,12 +36,11 @@ export default function PhotoUpload({
     };
   }, [previewUrl]);
 
-  // Reset preview if parent triggers reset
   useEffect(() => {
     if (resetSignal) {
       setPreviewUrl(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // clear file input
+        fileInputRef.current.value = ""; 
       }
     }
   }, [resetSignal]);

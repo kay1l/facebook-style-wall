@@ -1,45 +1,76 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/custom_components/header";
 import PhotoUpload from "@/components/custom_components/file_upload";
 import { supabase } from "@/lib/supaBaseClient";
-import { useEffect } from "react";
 import { getRelativeTime } from "@/lib/timeUtils";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Home() {
   const [wallText, setWallText] = useState("");
-  const maxChars = 280;
-  const remainingChars = maxChars - wallText.length;
   const [posts, setPosts] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [resetSignal, setResetSignal] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const pageSize = 5; // how many posts per load
+  const [lastPostCreatedAt, setLastPostCreatedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPosts();
+    loadInitialPosts();
   }, []);
 
-  const fetchPosts = async () => {
+  const loadInitialPosts = async () => {
     const { data, error } = await supabase
       .from("posts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(pageSize);
 
     if (error) {
       console.error("Error fetching posts:", error);
     } else {
       setPosts(data || []);
+      if (data && data.length > 0) {
+        setLastPostCreatedAt(data[data.length - 1].created_at);
+      }
     }
+  };
+
+  const loadMorePosts = async () => {
+    if (!lastPostCreatedAt) return;
+    setLoadingMore(true);
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(pageSize)
+      .lt("created_at", lastPostCreatedAt);
+
+    if (error) {
+      console.error("Error loading more posts:", error);
+      toast.error("Failed to load more posts.");
+    } else {
+      setPosts(prev => [...prev, ...(data || [])]);
+      if (data && data.length > 0) {
+        setLastPostCreatedAt(data[data.length - 1].created_at);
+      } else {
+        setLastPostCreatedAt(null); // no more posts
+      }
+    }
+    setLoadingMore(false);
   };
 
   const handleShare = async (file?: File | null) => {
     if (!wallText.trim() && !file) {
-      alert("Please enter a message or select a photo.");
+      toast.error("Please enter a message or select a photo.");
       return;
     }
     setIsUploading(true);
@@ -47,13 +78,13 @@ export default function Home() {
 
     if (file) {
       const filePath = `wall/${Date.now()}_${file.name}`;
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("wall-uploads")
         .upload(filePath, file);
 
       if (uploadError) {
         console.error("Error uploading file:", uploadError);
-        alert("Failed to upload photo.");
+        toast.error("Failed to upload photo.");
         setIsUploading(false);
         return;
       }
@@ -76,13 +107,13 @@ export default function Home() {
 
     if (error) {
       console.log("Error inserting post", error);
-      alert("Something went wrong.");
+      toast.error("Something went wrong.");
     } else {
       setWallText("");
       setSelectedFile(null);
-      await new Promise((res) => setTimeout(res, 2000));
       setResetSignal(true);
-      await fetchPosts();
+      await loadInitialPosts(); // reload the first page to show the new post at top
+      toast.success("Post shared successfully!");
       setResetSignal(false);
     }
     setIsUploading(false);
@@ -96,9 +127,9 @@ export default function Home() {
         <div className="w-full md:w-1/3 flex flex-col items-center">
           <Image
             src="/images/kyle.png"
-            alt="Greg Wientjes"
-            width={200}
-            height={100}
+            alt="Kyle Gomez"
+            width={150}
+            height={150}
             className="rounded"
           />
           <p className="font-bold mt-2 text-2xl">Kyle Gomez</p>
@@ -106,21 +137,12 @@ export default function Home() {
             <p className="font-bold text-lg text-gray-700 border-b pb-1 mb-2">
               Information
             </p>
-            <div className="mb-3">
-              {/* <p className="text-blue-500 font-semibold">Information</p> */}
-              <p className="text-gray-600">Kyle Gomez</p>
-              <p className="text-gray-600">Web Developer</p>
-            </div>
-
-            <div className="mb-3">
-              <p className="text-blue-500 font-semibold">Birthday</p>
-              <p className="text-gray-600">August 31, 2002</p>
-            </div>
-
-            <div>
-              <p className="text-blue-500 font-semibold">Current City</p>
-              <p className="text-gray-600">Ormoc City, Philippines</p>
-            </div>
+            <p className="text-gray-600">Kyle Gomez</p>
+            <p className="text-gray-600">Web Developer</p>
+            <p className="text-blue-500 font-semibold mt-2">Birthday</p>
+            <p className="text-gray-600">August 31, 2002</p>
+            <p className="text-blue-500 font-semibold mt-2">Current City</p>
+            <p className="text-gray-600">Ormoc City, Philippines</p>
           </div>
         </div>
 
@@ -131,16 +153,11 @@ export default function Home() {
             <Textarea
               placeholder="Write something..."
               value={wallText}
-              onChange={(e) => {
-                if (e.target.value.length <= maxChars) {
-                  setWallText(e.target.value);
-                }
-              }}
+              onChange={(e) => setWallText(e.target.value.slice(0, 280))}
               className="border-2 border-dashed border-gray-400 rounded bg-white min-h-[100px]"
             />
-
-            <div className="text-xs text-gray-500 mt-3 bottom-2 right-2">
-              {remainingChars} characters remaining
+            <div className="text-xs text-gray-500 mt-1">
+              {280 - wallText.length} characters remaining
             </div>
             <div className="mt-2">
               <PhotoUpload
@@ -156,20 +173,24 @@ export default function Home() {
                 Share
               </Button>
             </div>
-          </div>
-          <div className="mt-4 space-y-4">
+         
             {isUploading && (
-              <div className="flex flex-col items-center justify-center">
+              <div className="flex flex-col items-center justify-start">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
                 <p className="text-xs text-gray-500 mt-1">Uploading...</p>
               </div>
             )}
+           
+          </div>
+
+          <div className="mt-4 space-y-4">
+           
 
             {posts.map((post, idx) => (
               <div key={idx} className="border-b pb-2">
                 <p className="font-bold text-md mb-1">Kyle Gomez</p>
                 <div className="flex justify-between items-center text-sm">
-                  <p className="">{post.body}</p>
+                  <p>{post.body}</p>
                   <p className="text-xs text-gray-500 whitespace-nowrap">
                     {getRelativeTime(post.created_at)}
                   </p>
@@ -179,14 +200,34 @@ export default function Home() {
                     <Image
                       src={`${post.image_url}?cache_bust=${Date.now()}`}
                       alt="Wall post image"
-                      width={300}
-                      height={200}
+                      width={150}
+                      height={100}
                       className="rounded"
                     />
                   </div>
                 )}
               </div>
             ))}
+
+            {lastPostCreatedAt && (
+              <div className="flex justify-center">
+                <Button className="bg-blue-500" onClick={loadMorePosts} disabled={loadingMore}>
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More"
+                  )}
+                </Button>
+              </div>
+            )}
+            {!lastPostCreatedAt && posts.length > 0 && (
+              <p className="text-center text-sm text-gray-500">
+                You’ve reached the end.
+              </p>
+            )}
           </div>
         </div>
       </div>
