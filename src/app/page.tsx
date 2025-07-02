@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import Header from "@/components/custom_components/header";
 
 export default function Home() {
   const [wallText, setWallText] = useState("");
@@ -43,8 +44,11 @@ export default function Home() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+   
+    <div className="max-w-12xl mx-auto p-4">
+      <Header />
       <div className="flex flex-col md:flex-row gap-4">
+      
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/3 flex flex-col items-center">
           <Image
@@ -72,7 +76,7 @@ export default function Home() {
         <div className="w-full md:w-2/3">
           <p className="font-bold text-lg">Kyle Gomez</p>
          <Separator className="mt-5 mb-5" />
-          <p className="font-semibold">Wall</p>
+          <p className="font-bold text-2xl">Wall</p>
 
           <Textarea
             placeholder="Write something..."
